@@ -21,7 +21,7 @@ class warehouse_store(object):
         3. total weight and volume that can be carried by the supplier (truck)
            this should be less than the average sales volume and weight.
         '''
-        self.simulation_duration = 8#1388 (1396-8)
+        self.simulation_duration = 1392#1392 (1396-8)
         self.states = None
         self.action = None
         self.weight_capacity = 1000 ## DOUBLE CHECK
@@ -44,7 +44,7 @@ class warehouse_store(object):
                         self.products_metadata['unit_volume'].to_numpy().reshape(num_products,1),
                         self.products_metadata['unit_weight'].to_numpy().reshape(num_products,1),
                         self.products_metadata['shelf_life'].to_numpy().reshape(num_products,1)))
-        ## Initial action is random
+        ## Initial action is random.
         self.action = np.random.randint(0,5,(num_products,1))
         return None
 
@@ -62,21 +62,20 @@ class warehouse_store(object):
         curr_timestep = 0
         while curr_timestep <= self.simulation_duration:
             self.states[:,0,None] -= self.action
-            print("Time step = ",curr_timestep)
-            print(self.states[:,1:3])
             self.bookkeep(curr_timestep)
             curr_timestep += 1
             ## TODO: Replenish stock at certain intervals.
-            ## TODO: Update forecast to have next two days of expected sales.
-        # print(self.states)
+            ## TODO:
+            #  Update forecast to have next two days of expected sales.
         return None
 
     def bookkeep(self, timestep):
         '''
         Update forecasts and remove expired products from inventory.
         '''
-        # initial_forecast = forecast_data.iloc[0:2,2:].to_numpy().T
         next_timestamp = int(np.floor(timestep/4))
+        if timestep%4 == 0 and timestep != 0:
+            next_timestamp -= 1
         self.states[:,1:3] = self.forecast_data.iloc[next_timestamp:next_timestamp+2,2:].to_numpy().T
         return None
 
