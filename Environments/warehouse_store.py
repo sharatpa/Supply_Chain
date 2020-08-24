@@ -19,9 +19,10 @@ class warehouse_store(object):
         1. number of timesteps and total simulation duration.
         2. states and action spaces.
         3. total weight and volume that can be carried by the supplier (truck)
-           this should be less than the average sales volume and weight.
+            this should be less than the average sales volume and weight.
+        4. variables to store data files.
         '''
-        self.simulation_duration = 1392#1392 (1396-8)
+        self.simulation_duration = 125#1392 (1396-8)
         self.states = None
         self.action = None
         self.weight_capacity = 1000 ## DOUBLE CHECK
@@ -51,32 +52,36 @@ class warehouse_store(object):
     def simulate(self, metadata, forecast_data):
         '''
         Keeps track of inventory and constraints.
+        An artificial demand is created that is a Gaussian distribution
+        of the expected forecast.
         Sign conventions:
             1. Removing items from warehouse = Negative
             2. Adding items to warehouse = Positive
         '''
-        ##TODO: Maintain stock of inventory.
-        ##TODO: Check when product will expire with shelf life.
-        ##TODO: If stock reaches 0, make sure you can't sell that product.
         self.initialize(metadata, forecast_data)
         curr_timestep = 0
         while curr_timestep <= self.simulation_duration:
             self.states[:,0,None] -= self.action
+            ## Ensure inventory does not become less than zero.
+            self.states[:,0][self.states[:,0] < 0] = 0
             self.bookkeep(curr_timestep)
             curr_timestep += 1
             ## TODO: Replenish stock at certain intervals.
-            ## TODO:
-            #  Update forecast to have next two days of expected sales.
+            ## TODO: Volume and weight constraints.
         return None
 
     def bookkeep(self, timestep):
         '''
         Update forecasts and remove expired products from inventory.
+        Currently, removal of "expired" products is done by removing
+        20% of existing inventory at the end of the month.
         '''
         next_timestamp = int(np.floor(timestep/4))
         if timestep%4 == 0 and timestep != 0:
             next_timestamp -= 1
         self.states[:,1:3] = self.forecast_data.iloc[next_timestamp:next_timestamp+2,2:].to_numpy().T
+        if timestep%120 == 0 and timestep != 0:
+            self.states[:,0] = np.ceil(0.8*self.states[:,0])
         return None
 
 
