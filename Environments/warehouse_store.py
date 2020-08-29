@@ -7,8 +7,11 @@ the warehouse and store, i.e. the final part of the supply chain.
 import numpy as np
 import os
 import pandas as pd
+import random
 
 from pathlib import Path
+
+from scipy.stats import gaussian_kde
 
 
 class warehouse_store(object):
@@ -22,31 +25,32 @@ class warehouse_store(object):
             this should be less than the average sales volume and weight.
         4. variables to store data files.
         '''
-        self.simulation_duration = 125#1392 (1396-8)
+        self.simulation_duration = 1392#1392 (1396-8)
         self.states = None
         self.action = None
         self.weight_capacity = 1000 ## DOUBLE CHECK
         self.volume_capacity = 1000 ## DOUBLE CHECK
-        self.products_metadata = None
+        self.products_meta = None
         self.forecast_data = None
+        self.num_prod = 0
 
     def initialize(self, metadata, forecast_data):
         '''
         Reads data files; initializes states and actions.
         '''
-        self.products_metadata = pd.read_excel(metadata,sheet_name="50_products")
+        self.products_meta = pd.read_excel(metadata,sheet_name="50_products")
         self.forecast_data = pd.read_excel(forecast_data,sheet_name="50_products")
-        num_products = self.products_metadata.shape[0]
+        self.num_prod = self.products_meta.shape[0]
         ## Immediate forecasts include the forecasts for the next 2 days.
         immediate_forecasts = self.forecast_data.iloc[0:2,2:].to_numpy().T
-        current_inventory = 10*np.ones([num_products,1])
+        current_inventory = 10*np.ones([self.num_prod,1])
         self.states = np.hstack((current_inventory,
                         immediate_forecasts,
-                        self.products_metadata['unit_volume'].to_numpy().reshape(num_products,1),
-                        self.products_metadata['unit_weight'].to_numpy().reshape(num_products,1),
-                        self.products_metadata['shelf_life'].to_numpy().reshape(num_products,1)))
+                        self.products_meta['unit_volume'].to_numpy().reshape(self.num_prod,1),
+                        self.products_meta['unit_weight'].to_numpy().reshape(self.num_prod,1),
+                        self.products_meta['shelf_life'].to_numpy().reshape(self.num_prod,1)))
         ## Initial action is random.
-        self.action = np.random.randint(0,5,(num_products,1))
+        self.action = np.random.randint(0,5,(self.num_prod,1))
         return None
 
     def simulate(self, metadata, forecast_data):
@@ -60,15 +64,32 @@ class warehouse_store(object):
         '''
         self.initialize(metadata, forecast_data)
         curr_timestep = 0
-        while curr_timestep <= self.simulation_duration:
-            self.states[:,0,None] -= self.action
+        demand = self.get_demand()
+        while curr_timestep < self.simulation_duration:
+            self.states[:,0,None] -= demand[curr_timestep,:,None]#self.action
             ## Ensure inventory does not become less than zero.
             self.states[:,0][self.states[:,0] < 0] = 0
             self.bookkeep(curr_timestep)
             curr_timestep += 1
-            ## TODO: Replenish stock at certain intervals.
             ## TODO: Volume and weight constraints.
         return None
+    
+    def get_demand(self):
+        '''
+        Creates artificial demand at each time step.
+        '''
+        demand = np.zeros((self.simulation_duration,self.num_prod))
+        forecast_data = self.forecast_data.to_numpy()
+        for prod in range(2,forecast_data.shape[1]):
+            prod_distr = gaussian_kde(forecast_data[:,prod].astype(np.int))
+            resampled_distr = prod_distr.resample(forecast_data[:,prod].astype(np.int).shape)
+            std_dev_re = int(np.std(resampled_distr))
+            for timestep in range(0,self.simulation_duration,4):
+                daily_dem = lambda: int(forecast_data[int(timestep/4),prod]+random.randint(0,std_dev_re))
+                demand[timestep,prod-2] = daily_dem()
+                demand[timestep+1,prod-2] = daily_dem()
+                demand[timestep+2,prod-2] = daily_dem()
+        return demand
 
     def bookkeep(self, timestep):
         '''
@@ -83,7 +104,6 @@ class warehouse_store(object):
         if timestep%120 == 0 and timestep != 0:
             self.states[:,0] = np.ceil(0.8*self.states[:,0])
         return None
-
 
 if __name__ == "__main__":
    metadata_file = Path(os.path.dirname(os.getcwd())+"/data/instacart-market-basket-analysis/products_metadata.xlsx")
