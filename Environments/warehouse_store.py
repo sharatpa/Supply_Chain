@@ -53,7 +53,7 @@ class warehouse_store(object):
         self.action = np.random.randint(0,5,(self.num_prod,1))
         return None
 
-    def simulate(self, metadata, forecast_data):
+    def simulate(self, metadata, forecast_data, reward_func, agent):
         '''
         Keeps track of inventory and constraints.
         An artificial demand is created that is a Gaussian distribution
@@ -109,4 +109,5 @@ if __name__ == "__main__":
    metadata_file = Path(os.path.dirname(os.getcwd())+"/data/instacart-market-basket-analysis/products_metadata.xlsx")
    forecast_data = Path(os.path.dirname(os.getcwd())+"/data/instacart-market-basket-analysis/scenarios.xlsx")
    w = warehouse_store()
-   w.simulate(metadata_file, forecast_data)
+   reward_func = 0
+   w.simulate(metadata_file, forecast_data, reward_func, agent)
